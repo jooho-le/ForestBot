@@ -23,6 +23,7 @@
 - React Router
 - Zustand
 - @capacitor-mlkit/barcode-scanning
+- html5-qrcode
 
 ## 설치 방법
 
@@ -43,6 +44,23 @@ npm run dev
 ```bash
 npm run build
 ```
+
+## Vercel 웹 배포 후 카메라 스캔
+
+이 프로젝트는 웹 배포 환경에서 `html5-qrcode`로 휴대폰 브라우저 카메라를 열어 QR/바코드를 스캔합니다.
+
+```bash
+npm run build
+```
+
+Vercel에 배포한 뒤 휴대폰에서 `https://...vercel.app/scan` 주소로 접속하고 `카메라로 스캔하기`를 누르면 브라우저 카메라 권한 요청이 표시됩니다.
+
+웹 카메라 스캔 조건:
+
+- Vercel처럼 HTTPS로 접속해야 합니다.
+- iPhone/Android 실제 기기 브라우저에서 테스트해야 합니다.
+- QR/바코드 안의 값은 앱에 등록된 `kit_id`여야 합니다.
+- 카메라 권한을 거부한 경우 브라우저 설정에서 권한을 다시 허용해야 합니다.
 
 ## Capacitor 초기화 및 앱 빌드 방법
 
@@ -91,4 +109,3 @@ Xcode에서 Signing 설정 후 실행합니다.
 ## 향후 백엔드 API 연동 방법
 
 현재 데이터 조회는 `src/services/kitService.ts`에서 `src/data/kits.ts` mock DB를 참조합니다. 백엔드가 준비되면 `getKitById`, `getKitsByIds`, `getAllKits` 함수 내부만 `fetch` 또는 API client 호출로 교체하면 됩니다. 화면과 계산 로직은 `Kit` 타입과 service layer에 의존하므로 라우팅과 UI를 크게 바꾸지 않고 연동할 수 있습니다.
-

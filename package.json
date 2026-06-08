@@ -10,11 +10,12 @@
     "cap:sync": "cap sync"
   },
   "dependencies": {
+    "@capacitor-mlkit/barcode-scanning": "^7.3.0",
     "@capacitor/android": "^7.4.4",
     "@capacitor/core": "^7.4.4",
     "@capacitor/ios": "^7.4.4",
-    "@capacitor-mlkit/barcode-scanning": "^7.3.0",
     "@vitejs/plugin-react": "^5.0.4",
+    "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

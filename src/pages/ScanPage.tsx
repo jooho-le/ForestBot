@@ -1,8 +1,8 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Camera, Keyboard, QrCode } from 'lucide-react';
+import { Camera, Keyboard, QrCode, X } from 'lucide-react';
+import WebBarcodeScanner from '../components/WebBarcodeScanner';
 import { getKitById } from '../services/kitService';
-import { isNativePlatform, requestCameraPermission, scanCode } from '../services/scannerService';
 import { useForestStore } from '../store/useForestStore';
 
 const sampleKitIds = ['KIT-2026-JB-MUJU-0001', 'KIT-2026-JB-JINAN-0002', 'KIT-2026-JB-JANGSU-0003'];
@@ -12,11 +12,10 @@ export default function ScanPage() {
   const [searchParams] = useSearchParams();
   const [kitId, setKitId] = useState(searchParams.get('kit_id') ?? '');
   const [message, setMessage] = useState('');
-  const [isScanning, setIsScanning] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const recordScan = useForestStore((state) => state.recordScan);
-  const platformLabel = useMemo(() => (isNativePlatform() ? '모바일 앱 스캔' : '웹 입력 fallback'), []);
 
-  async function openKitById(nextKitId: string) {
+  const openKitById = useCallback(async (nextKitId: string) => {
     const normalizedKitId = nextKitId.trim().toUpperCase();
     const kit = await getKitById(normalizedKitId);
 
@@ -27,26 +26,27 @@ export default function ScanPage() {
 
     recordScan(kit.kitId);
     navigate(`/kit/${kit.kitId}`);
+  }, [navigate, recordScan]);
+
+  function handleScannerOpen() {
+    setMessage('');
+    setIsScannerOpen(true);
   }
 
-  async function handleScan() {
-    setMessage('');
-    setIsScanning(true);
-
-    try {
-      const permissionGranted = await requestCameraPermission();
-      if (!permissionGranted && isNativePlatform()) {
-        setMessage('카메라 권한이 필요합니다. 설정에서 권한을 허용해 주세요.');
-        return;
-      }
-
-      const scannedValue = await scanCode();
+  const handleDetected = useCallback(
+    async (scannedValue: string) => {
+      setIsScannerOpen(false);
       await openKitById(scannedValue);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : '스캔 중 문제가 발생했습니다.');
-    } finally {
-      setIsScanning(false);
-    }
+    },
+    [openKitById],
+  );
+
+  const handleScannerError = useCallback((errorMessage: string) => {
+    setMessage(errorMessage);
+  }, []);
+
+  function handleScannerClose() {
+    setIsScannerOpen(false);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -57,24 +57,39 @@ export default function ScanPage() {
   return (
     <div className="space-y-5">
       <section className="rounded-[2rem] bg-white p-5 shadow-soft">
-        <div className="grid aspect-square place-items-center rounded-[1.5rem] border-4 border-dashed border-forest-200 bg-forest-50">
-          <div className="text-center">
-            <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-forest-700 text-white">
-              <QrCode size={42} />
-            </div>
-            <h1 className="mt-4 text-2xl font-black text-forest-950">QR/바코드 스캔</h1>
-            <p className="mt-2 text-sm font-semibold text-slate-500">{platformLabel}</p>
+        {isScannerOpen ? (
+          <div className="space-y-3">
+            <WebBarcodeScanner onDetected={handleDetected} onError={handleScannerError} />
+            <button
+              type="button"
+              onClick={handleScannerClose}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-forest-100 bg-white px-4 py-4 text-sm font-black text-forest-800"
+            >
+              <X size={20} />
+              스캔 닫기
+            </button>
           </div>
-        </div>
-        <button
-          type="button"
-          onClick={handleScan}
-          disabled={isScanning}
-          className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-forest-700 px-4 py-4 text-sm font-black text-white disabled:opacity-60"
-        >
-          <Camera size={20} />
-          {isScanning ? '스캔 준비 중...' : '카메라로 스캔하기'}
-        </button>
+        ) : (
+          <>
+            <div className="grid aspect-square place-items-center rounded-[1.5rem] border-4 border-dashed border-forest-200 bg-forest-50">
+              <div className="text-center">
+                <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-forest-700 text-white">
+                  <QrCode size={42} />
+                </div>
+                <h1 className="mt-4 text-2xl font-black text-forest-950">QR/바코드 스캔</h1>
+                <p className="mt-2 text-sm font-semibold text-slate-500">휴대폰 브라우저 카메라 스캔</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleScannerOpen}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-forest-700 px-4 py-4 text-sm font-black text-white"
+            >
+              <Camera size={20} />
+              카메라로 스캔하기
+            </button>
+          </>
+        )}
       </section>
 
       <form onSubmit={handleSubmit} className="rounded-3xl border border-forest-100 bg-white p-4 shadow-soft">
