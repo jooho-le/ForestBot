@@ -6,6 +6,31 @@ type WebBarcodeScannerProps = {
   onError?: (message: string) => void;
 };
 
+function getCameraErrorMessage(error: unknown): string {
+  const userAgent = navigator.userAgent.toLowerCase();
+  const isInAppBrowser = /kakaotalk|instagram|fbav|fban|line|naver/.test(userAgent);
+
+  if (isInAppBrowser) {
+    return '카카오톡 같은 인앱 브라우저에서는 카메라가 제한될 수 있습니다. Safari 또는 Chrome으로 다시 열어 주세요.';
+  }
+
+  if (error instanceof DOMException) {
+    if (error.name === 'NotAllowedError') {
+      return '카메라 권한이 차단되었습니다. 브라우저 주소창의 권한 설정에서 카메라를 허용해 주세요.';
+    }
+
+    if (error.name === 'NotFoundError') {
+      return '사용 가능한 카메라를 찾지 못했습니다.';
+    }
+
+    if (error.name === 'NotReadableError') {
+      return '다른 앱이 카메라를 사용 중입니다. 카메라 앱을 닫고 다시 시도해 주세요.';
+    }
+  }
+
+  return '카메라를 열 수 없습니다. Safari/Chrome 브라우저와 HTTPS 접속 상태를 확인해 주세요.';
+}
+
 export default function WebBarcodeScanner({ onDetected, onError }: WebBarcodeScannerProps) {
   const generatedId = useId();
   const readerId = `barcode-reader-${generatedId.replace(/:/g, '')}`;
@@ -39,34 +64,36 @@ export default function WebBarcodeScanner({ onDetected, onError }: WebBarcodeSca
       scannerRef.current = scanner;
 
       try {
-        await scanner.start(
-          { facingMode: { ideal: 'environment' } },
-          {
-            fps: 10,
-            qrbox: (viewfinderWidth, viewfinderHeight) => {
-              const minViewfinderSize = Math.min(viewfinderWidth, viewfinderHeight);
-              const edge = Math.floor(minViewfinderSize * 0.72);
-              const boundedEdge = Math.min(Math.max(edge, 160), Math.max(minViewfinderSize - 16, 120));
-              return { width: boundedEdge, height: boundedEdge };
-            },
-            aspectRatio: 1,
+        const scanConfig = {
+          fps: 10,
+          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+            const minViewfinderSize = Math.min(viewfinderWidth, viewfinderHeight);
+            const edge = Math.floor(minViewfinderSize * 0.72);
+            const boundedEdge = Math.min(Math.max(edge, 160), Math.max(minViewfinderSize - 16, 120));
+            return { width: boundedEdge, height: boundedEdge };
           },
-          (decodedText) => {
-            if (detectedRef.current) {
-              return;
-            }
+          aspectRatio: 1,
+        };
+        const onScanSuccess = (decodedText: string) => {
+          if (detectedRef.current) {
+            return;
+          }
 
-            const value = decodedText.trim();
-            if (!value) {
-              return;
-            }
+          const value = decodedText.trim();
+          if (!value) {
+            return;
+          }
 
-            detectedRef.current = true;
-            setStatus('스캔 완료');
-            onDetected(value);
-          },
-          undefined,
-        );
+          detectedRef.current = true;
+          setStatus('스캔 완료');
+          onDetected(value);
+        };
+
+        try {
+          await scanner.start({ facingMode: { ideal: 'environment' } }, scanConfig, onScanSuccess, undefined);
+        } catch {
+          await scanner.start({ facingMode: 'environment' }, scanConfig, onScanSuccess, undefined);
+        }
 
         if (!isMounted) {
           await scanner.stop();
@@ -77,8 +104,8 @@ export default function WebBarcodeScanner({ onDetected, onError }: WebBarcodeSca
         if (isMounted) {
           setStatus('QR 또는 바코드를 카메라 중앙에 맞춰 주세요.');
         }
-      } catch {
-        const message = '카메라를 열 수 없습니다. 브라우저 권한과 HTTPS 접속 상태를 확인해 주세요.';
+      } catch (error) {
+        const message = getCameraErrorMessage(error);
         if (isMounted) {
           setStatus(message);
           onError?.(message);
