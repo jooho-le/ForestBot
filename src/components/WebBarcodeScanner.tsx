@@ -28,6 +28,10 @@ function getCameraErrorMessage(error: unknown): string {
     }
   }
 
+  if (error instanceof Error && error.message) {
+    return `카메라를 열 수 없습니다. Safari에서 다시 열어 주세요. (${error.message})`;
+  }
+
   return '카메라를 열 수 없습니다. Safari/Chrome 브라우저와 HTTPS 접속 상태를 확인해 주세요.';
 }
 
@@ -91,8 +95,20 @@ export default function WebBarcodeScanner({ onDetected, onError }: WebBarcodeSca
 
         try {
           await scanner.start({ facingMode: { ideal: 'environment' } }, scanConfig, onScanSuccess, undefined);
-        } catch {
-          await scanner.start({ facingMode: 'environment' }, scanConfig, onScanSuccess, undefined);
+        } catch (facingModeError) {
+          try {
+            const cameras = await Html5Qrcode.getCameras();
+            const rearCamera =
+              cameras.find((camera) => /back|rear|environment|후면/i.test(camera.label)) ?? cameras[cameras.length - 1] ?? cameras[0];
+
+            if (!rearCamera) {
+              throw facingModeError;
+            }
+
+            await scanner.start(rearCamera.id, scanConfig, onScanSuccess, undefined);
+          } catch {
+            throw facingModeError;
+          }
         }
 
         if (!isMounted) {
